@@ -72,7 +72,7 @@ Network Block → P2P Layer → Consensus → Executor → Storage → State Upd
 
 ## Core Components
 
-### Consensus Engine (`src/consensus/`)
+### Consensus Engine (`savitri-consensus/src/consensus/`)
 ```rust
 pub struct ConsensusEngine {
     pub committee: Vec<ValidatorInfo>,    // Active validators
@@ -80,8 +80,16 @@ pub struct ConsensusEngine {
     pub pou_scorer: PoUScorer,             // Proof of Unity scoring
     pub certificate_generator: CertGenerator, // Certificate generation
     pub evidence_collector: EvidenceCollector, // Evidence collection
+    pub replay_guard: ReplayGuard,         // Replay protection
+    pub score_cache: ScoreCache,           // PoU score caching
 }
 ```
+
+**Location:** `savitri-consensus/` crate (workspace member)
+**Modules:**
+- `src/consensus/engine.rs` - Main consensus engine
+- `src/consensus/evidence.rs` - Evidence collection
+- `src/pou/` - PoU scoring system with fixed-point arithmetic
 
 **Responsibilities:**
 - Leader election using PoU scoring (U/L/I/R/P components)
@@ -90,6 +98,9 @@ pub struct ConsensusEngine {
 - Evidence collection and slashing for misbehavior
 - Round state management and timeout handling
 - Engine events emission for runtime coordination
+- Replay protection for proposals and votes
+- PoU score caching and optimization
+- ZKP proof generation for certificates
 
 ### Execution Engine (`src/executor/`)
 ```rust
@@ -110,7 +121,7 @@ pub struct ExecutionDispatcher {
 - Transaction validation and conflict resolution
 - Performance metrics collection and optimization
 
-### Storage Layer (`src/storage/`)
+### Storage Layer (`savitri-storage/src/` or `src/storage/`)
 ```rust
 pub struct Storage {
     pub db: DB,                              // RocksDB instance
@@ -119,6 +130,8 @@ pub struct Storage {
     pub monolith_manager: MonolithManager,    // Monolith handling
 }
 ```
+
+**Location:** Storage implementation exists both in main `src/storage/` and as workspace crate
 
 **Column Families:**
 - `CF_DEFAULT`: Default RocksDB column family
@@ -137,7 +150,7 @@ pub struct Storage {
 - `CF_VESTING`: Vesting schedules
 - `CF_SUPPLY_METRICS`: Token supply metrics
 
-### P2P Network (`src/p2p/`)
+### P2P Network (`savitri-p2p/src/p2p/`)
 ```rust
 pub struct P2PService {
     pub swarm: Swarm<Behaviour>,              // libp2p swarm
@@ -146,6 +159,14 @@ pub struct P2PService {
     pub message_handler: MessageHandler,      // Message processing
 }
 ```
+
+**Location:** `savitri-p2p/` crate (workspace member)
+**Modules:**
+- `src/p2p/network.rs` - Network management
+- `src/p2p/gossip.rs` - GossipSub protocol
+- `src/p2p/discovery.rs` - Peer discovery
+- `src/p2p/messages.rs` - Message routing
+- `src/networking/compression.rs` - Message compression
 
 **Protocols:**
 - Gossipsub for message propagation (consensus, transactions, blocks)
@@ -161,6 +182,16 @@ pub struct P2PService {
 - `TransactionMessage`: Transaction gossip
 - `MonolithMessage`: Monolith distribution
 - `StateRequest`: State queries and proofs
+
+**Consensus Events:**
+- `RoundStarted`: New consensus round initiated
+- `ShouldPropose`: Node selected as leader
+- `ProposalReceived`: Block proposal received
+- `CertificateCreated`: Consensus certificate generated
+- `EvidenceDetected`: Misbehavior evidence collected
+- `BlockFinalized`: Block finalized with proposer PoU score
+- `ProposerScoreUpdate`: Validator score update triggered
+- `RewardDistributionTriggered`: Fee distribution initiated
 
 ## Node Types
 
@@ -212,6 +243,13 @@ Transaction Batch → Score Cache → SIMD Processing → Result Aggregation
 2. **SIMD Processing**: Vectorized computation for misses
 3. **Result Combination**: Merge cached and computed results
 4. **Cache Update**: Store new scores for future use
+
+**SIMD Features:**
+- x86_64 AVX2+FMA: 4-lane processing (~2-3x speedup)
+- ARM NEON: 2-lane processing (~1.5-2x speedup)
+- Runtime feature detection with automatic fallback
+- Deterministic results with 1e-10 precision guarantee
+- Cross-platform compatibility (stable intrinsics)
 
 ### Adaptive Weight Scheduling
 ```
@@ -276,6 +314,9 @@ Block Headers → Headers Commit → ZKP Proof → Monolith Header → Storage
 - **Block Time**: 1-2 seconds per block
 - **Sync Time**: <30 seconds for mobile nodes
 - **Storage Efficiency**: <100MB for light nodes
+- **SIMD Performance**: 2-3x speedup for transaction scoring
+- **Cache Hit Rate**: >90% for score cache
+- **Score Computation**: <1ms per validator with PoU
 
 ## Reliability Architecture
 
@@ -329,4 +370,11 @@ pub struct NodeConfig {
 - **Configuration System**: Hot-reloadable configuration
 - **Event System**: Async event bus for component communication
 
-This architecture provides a comprehensive foundation for a scalable, secure, and performant blockchain network.
+## API Documentation
+
+For detailed API documentation, see:
+- **[Consensus Events API](../api/consensus-events.md)** - Event-driven consensus integration
+- **[Score Cache API](../api/score-cache-api.md)** - High-performance PoU score caching
+- **[API Overview](../api/README.md)** - Integration patterns and best practices
+
+This architecture provides a comprehensive foundation for a scalable, secure, and performant blockchain network with modern API interfaces for seamless integration.

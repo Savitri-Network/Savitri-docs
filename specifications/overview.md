@@ -4,42 +4,72 @@
 
 Savitri Network is an enterprise-grade Layer 1 blockchain implementing a custom execution environment with BFT consensus, SIMD-optimized transaction processing, and adaptive weight scheduling.
 
-### Core Components
+### Core Components (Workspace Structure)
 
-**Consensus Layer**
+**Consensus Layer** (`savitri-consensus/`)
 - `src/consensus/` - BFT consensus engine with Proof of Unity (PoU) scoring
-- `src/core/slot_scheduler.rs` - Deterministic slot assignment and leader election
+- `src/pou/` - PoU score calculation with fixed-point arithmetic
+- `src/lib.rs` - Main consensus library entry point
 - Committee size: 4-256 validators with bond requirements (1M tokens minimum)
+- Features: BFT consensus, leader rotation, evidence collection, cross-shard finality
 
-**Execution Layer**
-- `src/executor/` - Transaction execution pipeline with SIMD optimization
+**Execution Layer** (`src/executor/`)
 - `src/executor/dispatcher.rs` - ExecutionDispatcher with adaptive weights
 - `src/executor/score_cache.rs` - Thread-safe caching for cross-batch optimization
+- `src/executor/fixed_point_simd.rs` - SIMD-optimized transaction scoring
+- SIMD optimization: AVX2/FMA for x86_64, NEON for ARM
 
-**Storage Layer**
-- `src/storage/` - RocksDB-based persistence with column families
-- `src/storage/monolith.rs` - Monolith block aggregation with ZKP proofs
+**Storage Layer** (`savitri-storage/`)
+- RocksDB-based persistence with column families
+- `src/storage/` - Storage management with monolith support
 - Column families: CF_ACCOUNTS, CF_TRANSACTIONS, CF_BLOCKS, CF_CONSENSUS, CF_BONDS
+- State root computation and overlay management
 
-**Network Layer**
+**Network Layer** (`savitri-p2p/`)
 - `src/p2p/` - libp2p-based networking with gossipsub message propagation
 - `src/p2p/messages.rs` - Protocol message definitions and serialization
-- `src/networking/` - Connection management and peer discovery
+- `src/p2p/gossip.rs` - GossipSub protocol implementation
+- `src/p2p/discovery.rs` - Peer discovery system
+- `src/networking/` - Connection management and compression
 
-**Cryptographic Layer**
+**Core Library** (`savitri-core/`)
+- `src/core/` - Base types, slot scheduler, monolith management
 - `src/crypto/` - Ed25519 signatures, Blake3 hashing, curve25519 operations
-- `src/zkp/` - Zero-knowledge proof system for monolith verification
-- SIMD-enabled cryptographic operations with runtime feature detection
+- `src/utils/` - Mathematical utilities and time management
+- `src/metrics/` - Metrics export and monitoring
 
-### Module Dependencies
+**Zero-Knowledge Proofs** (`savitri-zkp/`)
+- PLONK-based zero-knowledge proof system for monolith verification
+- Mock and real backend support with feature flags
+
+**Node Implementations**
+- `lightnode/` - Light node implementation for mobile devices
+- `masternode/` - Masternode with advanced services
+- `guardian/` - Guardian node for network security
+
+### Module Dependencies (Workspace Structure)
 
 ```
-consensus → storage → crypto
-    ↓           ↓        ↓
-executor ← mempool ← p2p
+savitri-consensus (BFT + PoU)
     ↓
-contracts ← governance
+savitri-core (types, crypto, slot scheduler)
+    ↓        ↓
+savitri-storage ← savitri-p2p (networking)
+    ↓
+src/executor (transaction execution)
+    ↓
+src/mempool → src/consensus
 ```
+
+**Workspace Members:**
+- `masternode/` - Masternode binary
+- `lightnode/` - Light node binary  
+- `guardian/` - Guardian node binary
+- `savitri-consensus/` - Consensus library crate
+- `savitri-core/` - Core types and utilities crate
+- `savitri-storage/` - Storage layer crate
+- `savitri-zkp/` - ZKP proof system crate
+- `savitri-p2p/` - P2P networking crate
 
 ## Key Architectural Decisions
 

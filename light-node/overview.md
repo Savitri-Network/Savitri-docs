@@ -4,6 +4,14 @@
 
 A Savitri Network light node is a resource-efficient blockchain client designed for mobile devices, embedded systems, and applications with limited resources. Light nodes provide essential blockchain functionality while maintaining minimal storage, bandwidth, and computational requirements through selective data synchronization and cryptographic verification.
 
+**Implementation Location:** `lightnode/` crate in the workspace
+**Main Entry Point:** `lightnode/src/main.rs`
+**Key Modules:**
+- `src/p2p/` - P2P networking integration
+- `src/availability.rs` - Availability tracking
+- `src/latency_service.rs` - Latency monitoring
+- `src/integrity.rs` - Integrity verification
+
 ## Technology Choice Rationale
 
 ### Why Light Node Architecture

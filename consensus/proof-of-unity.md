@@ -23,20 +23,22 @@ Where:
 ### Default Weight Configuration
 ```rust
 pub struct PoUWeights {
-    pub availability: f64,      // w_U = 0.25
-    pub latency: f64,          // w_L = 0.20
-    pub integrity: f64,         // w_I = 0.25
-    pub reputation: f64,       // w_R = 0.20
-    pub participation: f64,    // w_P = 0.10
+    pub availability: f64,      // w_U = 0.30 (30%)
+    pub latency: f64,          // w_L = 0.10 (10%)
+    pub integrity: f64,         // w_I = 0.25 (25%)
+    pub resources: f64,         // w_R = 0.20 (20%)
+    pub participation: f64,    // w_P = 0.15 (15%) - includes peer rating
 }
 ```
 
-**Weight Rationale:**
-- **Availability (25%)**: Critical for network stability
-- **Integrity (25%)**: Ensures correct protocol behavior
-- **Latency (20%)**: Important for performance
-- **Reputation (20%)**: Long-term reliability indicator
-- **Participation (10%)**: Encourages active engagement
+**Implementation Location:** `savitri-consensus/src/pou/` crate
+
+**Weight Rationale (from README.md):**
+- **Availability (30%)**: Critical for network stability and uptime
+- **Integrity (25%)**: Ensures correct protocol behavior and validation accuracy
+- **Resources (20%)**: CPU/Memory/Bandwidth utilization efficiency
+- **Participation (15%)**: Block proposals, attestations, and active engagement
+- **Latency (10%)**: Response time and network performance
 
 ## Component Scoring
 
@@ -520,6 +522,9 @@ impl Default for PoUConfig {
 - **Cache Hit Rate**: >90%
 - **Memory Usage**: <100MB for 10K validators
 - **Update Latency**: <5 seconds for score propagation
+- **SIMD Acceleration**: 2-3x speedup for batch scoring
+- **Cross-Batch Persistence**: Cache survives between scheduling calls
+- **Thread Safety**: Atomic operations for concurrent access
 
 ### Monitoring Metrics
 ```rust
@@ -530,6 +535,54 @@ pub struct PoUMetrics {
     pub leader_changes: u64,                     // Leader changes
     pub committee_changes: u64,                  // Committee changes
     pub anomaly_detections: u64,                  // Anomaly detections
+    pub simd_operations: u64,                    // SIMD batch operations
+    pub cache_size: usize,                       // Current cache size
+    pub thread_contentions: u64,                 // Cache lock contentions
+}
+```
+
+### Score Update Reasons
+```rust
+pub enum ScoreUpdateReason {
+    /// Successfully proposed a block
+    SuccessfulProposal,
+    /// Failed to propose (timeout, invalid)
+    FailedProposal,
+    /// Participated in consensus (voted correctly)
+    ConsensusParticipation,
+    /// Misbehavior detected (equivocation, etc.)
+    MisbehaviorDetected,
+    /// Periodic reputation adjustment
+    ReputationAdjustment,
+}
+```
+
+### Consensus Events Integration
+```rust
+pub enum EngineEvent {
+    // ... existing events ...
+    
+    /// ⭐ PoU Integration: Block finalized with proposer information
+    BlockFinalized {
+        height: u64,
+        round: u32,
+        proposer_id: [u8; 32],
+        proposer_pou_score: u32,
+        certificate: ConsensusCertificate,
+    },
+    /// ⭐ PoU Integration: Proposer score update needed
+    ProposerScoreUpdate {
+        proposer_id: [u8; 32],
+        old_score: u32,
+        new_score: u32,
+        reason: ScoreUpdateReason,
+    },
+    /// ⭐ PoU Integration: Reward distribution triggered
+    RewardDistributionTriggered {
+        epoch_id: u64,
+        height: u64,
+        total_fees: u128,
+    },
 }
 ```
 

@@ -582,4 +582,65 @@ impl Default for FaultToleranceConfig {
 }
 ```
 
+## Replay Protection
+
+### Replay Guard Implementation
+```rust
+pub struct ReplayGuard {
+    pub proposals: HashMap<(u64, u64, [u8; 32]), u64>, // (epoch, height, proposer) -> seq
+    pub votes: HashMap<(u64, u64, [u8; 32]), u64>,      // (epoch, height, voter) -> seq
+}
+
+impl ReplayGuard {
+    pub fn record_proposal(&mut self, proposal: &ConsensusProposal) -> ConsensusResult<()> {
+        let key = (proposal.epoch_id, proposal.height, proposal.proposer);
+        let current_seq = self.proposals.get(&key).copied().unwrap_or(0);
+        
+        if proposal.proposal_seq <= current_seq {
+            return Err(ConsensusError::ReplayDetected);
+        }
+        
+        self.proposals.insert(key, proposal.proposal_seq);
+        Ok(())
+    }
+    
+    pub fn record_vote(&mut self, vote: &ConsensusVote) -> ConsensusResult<()> {
+        let key = (vote.epoch_id, vote.height, vote.voter);
+        let current_seq = self.votes.get(&key).copied().unwrap_or(0);
+        
+        if vote.vote_seq <= current_seq {
+            return Err(ConsensusError::ReplayDetected);
+        }
+        
+        self.votes.insert(key, vote.vote_seq);
+        Ok(())
+    }
+}
+```
+
+### ZKP Certificate Integration
+```rust
+pub struct ZKPCertificate {
+    pub block_hash: Hash64,
+    pub height: u64,
+    pub round: u32,
+    pub proposer: [u8; 32],
+    pub signatures: Vec<Signature>,
+    pub zkp_proof: ZKProof,                    // Zero-knowledge proof
+    pub proposer_pou_score: u32,               // PoU score at time of proposal
+}
+
+impl ZKPCertificate {
+    pub fn verify_zkp_proof<V: ZkVerifier>(&self, verifier: &V) -> bool {
+        let statement = Statement::new(
+            self.block_hash,
+            self.height,
+            self.round,
+            self.proposer,
+        );
+        verifier.verify(&statement, &self.zkp_proof).unwrap_or(false)
+    }
+}
+```
+
 This fault tolerance system provides comprehensive protection against various failure modes while maintaining system availability and data integrity under adverse conditions.
